@@ -42,6 +42,7 @@ import { WalletClient } from "./WalletClient";
 import { WalletUtils } from "./WalletUtil";
 
 import JSBI from "jsbi";
+import { SodiumHelper } from "../utils/SodiumHelper";
 
 /**
  * Definition of a class with elements to be used as an output of a transaction
@@ -145,6 +146,7 @@ export class WalletReceiverContainer extends EventDispatcher {
      * If this value is true, if the same account address exists, it will be changed to a new amount.
      */
     public add(receiver: IWalletReceiver, replace: boolean = true): boolean {
+        console.log("WalletReceiverContainer:added:replace:"+replace);
         if (replace) {
             const elem = this.items.find((m) => PublicKey.equal(m.address, receiver.address));
             if (elem !== undefined) elem.amount = receiver.amount;
@@ -228,6 +230,7 @@ export class WalletSenderContainer extends EventDispatcher {
         const sender = new WalletSender(account);
         sender.drawn = Amount.make(drawn);
         this.items.push(sender);
+        console.log("WalletSenderContainer:added");
         return sender;
     }
 
@@ -544,19 +547,26 @@ export class WalletTxBuilder extends EventDispatcher {
     private async _calculate(already_changed: boolean = false) {
         const now = new Date().getTime();
         if (!this._manual_fee && now - this._latest_fee_rate_time > 60 * 1000) {
+            console.log("_calculat1:"+JSON.stringify(this._client.getEndpoint()));
             this._client.getTransactionFee(this._size_tx).then((res) => {
+                console.log("_calculat2");
                 if (res.code === WalletResultCode.Success && res.data !== undefined) {
+                    console.log("_calculat3");
                     this._fee_rate = JSBI.toNumber(
                         Amount.divide(res.data.getFee(this._fee_option), this._size_tx).value
                     );
+                    console.log("_calculat4");
                     if (this._fee_rate < Utils.FEE_RATE) this._fee_rate = Utils.FEE_RATE;
+                    console.log("_calculat5");
                 } else {
+                    console.log("_calculat6");
                     this._fee_rate = Utils.FEE_RATE;
                 }
             });
+            console.log("_calculat7");
             this._latest_fee_rate_time = now;
         }
-
+        console.log("_calculat8");
         let out_count = this.lengthReceiver;
         if (out_count === 0) out_count = 2;
         else out_count++;
@@ -573,6 +583,7 @@ export class WalletTxBuilder extends EventDispatcher {
         let new_total_spendable = Amount.make(0);
 
         let done = false; // If you have already made the amount to be transferred, this value is true.
+        console.log("_calculat9");
         for (const sender of this._senders.items) {
             const sender_old_enable = sender.enable;
             const sender_old_spendable = sender.spendable;
@@ -580,7 +591,9 @@ export class WalletTxBuilder extends EventDispatcher {
             const sender_old_remaining = sender.remaining;
 
             sender.spendable = sender.account.balance.spendable;
+            console.log("_calculat10");
             if (done) {
+                console.log("_calculat11");
                 sender.drawn = Amount.make(0);
                 sender.remaining = Amount.make(0);
                 sender.account.spendableUTXOProvider.giveBack(sender.utxos);
@@ -588,6 +601,7 @@ export class WalletTxBuilder extends EventDispatcher {
                 sender.total_amount_utxos = Amount.make(0);
                 new_total_spendable = Amount.add(new_total_spendable, sender.spendable);
             } else {
+                console.log("_calculat12");
                 const cs_res: { done: boolean; fee: Amount } = await this.calculateSender(
                     sender,
                     total_amount,
@@ -600,12 +614,15 @@ export class WalletTxBuilder extends EventDispatcher {
                 new_fee_tx = cs_res.fee;
 
                 // It is reflected in the total value.
+                console.log("_calculat13");
                 if (sender.enable) {
+                    console.log("_calculat14");
                     in_count += sender.utxos.length;
                     new_total_drawn = Amount.add(new_total_drawn, sender.drawn);
                     new_remaining = Amount.make(sender.remaining);
                     new_total_spendable = Amount.add(new_total_spendable, sender.spendable);
                 }
+                console.log("_calculat15");
             }
 
             // If the recipient's value has changed, indicate that it has changed.
@@ -615,16 +632,18 @@ export class WalletTxBuilder extends EventDispatcher {
                 !Amount.equal(sender_old_drawn, sender.drawn) ||
                 !Amount.equal(sender_old_remaining, sender.remaining)
             ) {
+                console.log("_calculat16");
                 changed = true;
             }
         }
-
+        console.log("_calculat17");
         // If the total value has been changed, indicate it.
         if (
             !Amount.equal(this._total_spendable, new_total_spendable) ||
             !Amount.equal(this._total_drawn, new_total_drawn) ||
             !Amount.equal(this._remaining, new_remaining)
         ) {
+            console.log("_calculat17.1");
             changed = true;
             this._total_spendable = Amount.make(new_total_spendable);
             this._total_drawn = Amount.make(new_total_drawn);
@@ -632,20 +651,25 @@ export class WalletTxBuilder extends EventDispatcher {
         }
 
         // If the data has been changed, send an event that it has been changed.
+        console.log("_calculat18");
         if (changed || already_changed) {
+            console.log("_calculat18.`");
             this.dispatchEvent(Event.CHANGE_SENDER);
         }
-
+        console.log("_calculat19");
         if (!Amount.equal(this._fee_tx, new_fee_tx) || !this._already_change_fee) {
+            console.log("_calculat19.1");
             this._fee_tx = Amount.make(new_fee_tx);
             this.dispatchEvent(Event.CHANGE_TX_FEE, this._fee_tx);
             this._already_change_fee = true;
         }
-
+        console.log("_calculat20");
         if (!Amount.equal(this._fee_payload, new_fee_payload)) {
+            console.log("_calculat20.1");
             this._fee_payload = Amount.make(new_fee_payload);
             this.dispatchEvent(Event.CHANGE_PAYLOAD_FEE, this._fee_payload);
         }
+        console.log("_calculat21");
     }
 
     /**
@@ -660,10 +684,13 @@ export class WalletTxBuilder extends EventDispatcher {
         for (let cnt = 0; cnt < max_try_cnt && !success; cnt++) {
             try {
                 await this._calculate(already_changed);
+                console.log("Calculate : ("+ cnt + "/" + max_try_cnt + ")");
                 success = true;
             } catch (e) {
+                console.log("Calculate : fault ("+ cnt + "/" + max_try_cnt + ") error: "+ e);
                 success = false;
             }
+            console.log("Calculate : Status : (" + success + ")");
             if (!success) {
                 if (cnt < max_try_cnt - 1) await this.initializeSenders();
                 else this.dispatchEvent(Event.ERROR, WalletResultCode.SystemError);
@@ -1191,6 +1218,12 @@ export class WalletTxBuilder extends EventDispatcher {
  * The transaction builder for multi sender, single receiver
  */
 export class WalletTxBuilderSingleReceiver extends WalletTxBuilder {
+
+    constructor(client:WalletClient) {
+        super(client);
+        console.log("WalletTxBuilderSingleReceiver constructor");
+    }
+
     private _receiver_address: PublicKey | undefined;
     private _receiver_amount: Amount | undefined;
 
@@ -1202,15 +1235,22 @@ export class WalletTxBuilderSingleReceiver extends WalletTxBuilder {
         if (this._receiver_address === undefined || !PublicKey.equal(this._receiver_address, address)) {
             changed = true;
         }
+        console.log("setReceiverAddress-0");
         this._receiver_address = new PublicKey(address.data);
+        console.log("setReceiverAddress-1");
         if (this._receiver_amount !== undefined) {
+            console.log("setReceiverAddress-2");
             this._receivers.clear();
+            console.log("setReceiverAddress-3");
             this._receivers.add({
                 address: this._receiver_address,
                 amount: this._receiver_amount,
             });
+            console.log("setReceiverAddress-4");
             if (changed) await this.calculate();
+            console.log("setReceiverAddress-5");
         }
+        console.log("setReceiverAddress-6");
         if (changed) this.dispatchEvent(Event.CHANGE_RECEIVER);
     }
 
@@ -1218,19 +1258,28 @@ export class WalletTxBuilderSingleReceiver extends WalletTxBuilder {
      * Set the amount of receiver
      */
     public async setReceiverAmount(amount: Amount) {
+        console.log("WalletTxBuilderSingleReceiver:setReceiverAmount:Call:("+amount.toString()+")");
         let changed = false;
         if (this._receiver_amount === undefined || Amount.notEqual(this._receiver_amount, amount)) {
             changed = true;
         }
+        console.log("setReceiverAmount-0");
         this._receiver_amount = Amount.make(amount);
+        console.log("setReceiverAmount-1");
         if (this._receiver_address !== undefined) {
+            console.log("setReceiverAmount-2");
             this._receivers.clear();
+            console.log("setReceiverAmount-3address"+this._receiver_address.data);
+            console.log("setReceiverAmount-3amount"+this._receiver_amount.toString());
             this._receivers.add({
                 address: this._receiver_address,
                 amount: this._receiver_amount,
             });
+            console.log("setReceiverAmount-4");
             if (changed) await this.calculate();
+            console.log("setReceiverAmount-5");
         }
+        console.log("setReceiverAmount-6");
         if (changed) this.dispatchEvent(Event.CHANGE_RECEIVER);
     }
 

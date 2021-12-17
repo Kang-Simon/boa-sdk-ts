@@ -121,9 +121,9 @@ export class PublicKey {
      */
     constructor(data: Buffer | Point | string) {
         if (typeof data === "string") {
+            console.log("KeyPair:string");
             if (data.length < PublicKey.HumanReadablePart.length || data.slice(0, 3) !== PublicKey.HumanReadablePart)
                 throw new Error("Differ in the human-readable part");
-
             const decoded = bech32m.decode(data);
             if (decoded.prefix !== PublicKey.HumanReadablePart) throw new Error("This is not the address of BOA");
 
@@ -142,8 +142,10 @@ export class PublicKey {
 
             this.point = new Point(key_data);
         } else if (data instanceof Point) {
+            console.log("KeyPair:point");
             this.point = new Point(data.data);
         } else {
+            console.log("KeyPair:crypto_core_ed25519_BYTES");
             if (data.length !== SodiumHelper.sodium.crypto_core_ed25519_BYTES)
                 throw new Error("The size of the input data is abnormal.");
             this.point = new Point(data);
