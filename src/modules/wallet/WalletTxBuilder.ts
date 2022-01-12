@@ -665,6 +665,9 @@ export class WalletTxBuilder extends EventDispatcher {
             this.dispatchEvent(Event.CHANGE_SENDER);
         }
 
+        console.log("TXFee : before : " + this._fee_tx.toString());
+        console.log("TXFee : newnew : " + new_fee_tx.toString());
+
         if (!Amount.equal(this._fee_tx, new_fee_tx) || !this._already_change_fee) {
             this._fee_tx = Amount.make(new_fee_tx);
             this.dispatchEvent(Event.CHANGE_TX_FEE, this._fee_tx);
@@ -675,6 +678,9 @@ export class WalletTxBuilder extends EventDispatcher {
             this._fee_payload = Amount.make(new_fee_payload);
             this.dispatchEvent(Event.CHANGE_PAYLOAD_FEE, this._fee_payload);
         }
+
+        console.log("FeeFreezing : before : " + this._fee_freezing.toString());
+        console.log("FeeFreezing : newnew : " + new_fee_freezing.toString());
 
         if (!Amount.equal(this._fee_freezing, new_fee_freezing)) {
             this._fee_freezing = Amount.make(new_fee_freezing);

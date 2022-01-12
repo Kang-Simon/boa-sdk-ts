@@ -66,6 +66,7 @@ export class WalletWatcher extends EventDispatcher {
         this.pullingTimer = undefined;
         this.pingTimer = undefined;
         this.duration = duration;
+        console.log("WalletWatcher ENDPOINT : " + this.client.getEndpoint().stoa);
         this.socket = io(this.client.getEndpoint().stoa);
     }
 
